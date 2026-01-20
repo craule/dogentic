@@ -9,7 +9,7 @@ import (
 	"github.com/Dogentadmin/dogent-agent/stats"
 )
 
-const (
+var (
 	Version = "1.0.0"
 )
 

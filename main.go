@@ -15,7 +15,7 @@ const (
 
 func main() {
 	// 1. Parse Args
-	serverURL := flag.String("server", "wss://dogent-api.craule.com/api/v1/agent/connect", "Dogent Server URL")
+	serverURL := flag.String("server", "wss://backend.dogent.net/api/v1/agent/connect", "Dogent Server URL")
 	token := flag.String("token", "", "Authentication Token")
 	serverID := flag.String("id", "", "Server ID")
 	flag.Parse()

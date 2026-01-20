@@ -1,6 +1,8 @@
 package client
 
 import (
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -20,19 +22,28 @@ type Config struct {
 	Token     string
 	ServerID  string
 	Version   string
+	PublicKey string // Base64 Ed25519 Public Key
 }
 
 type AgentClient struct {
-	config Config
-	conn   *websocket.Conn
-	done   chan struct{}
-	mu     sync.Mutex // Mutes for writing to websocket
+	config   Config
+	conn     *websocket.Conn
+	done     chan struct{}
+	mu       sync.Mutex
+	verifier ed25519.PublicKey
 }
 
 func NewAgentClient(cfg Config) *AgentClient {
+	// Parse Public Key once
+	pubBytes, err := base64.StdEncoding.DecodeString(cfg.PublicKey)
+	if err != nil {
+		log.Printf("⚠️ Warning: Invalid Public Key provided. Signature verification will fail. Error: %v", err)
+	}
+
 	return &AgentClient{
-		config: cfg,
-		done:   make(chan struct{}),
+		config:   cfg,
+		done:     make(chan struct{}),
+		verifier: ed25519.PublicKey(pubBytes),
 	}
 }
 
@@ -134,7 +145,42 @@ func (c *AgentClient) handleMessage(msg map[string]interface{}) {
 
 	case "command":
 		cmdContent, _ := msg["content"].(string)
-		log.Printf("📢 Received Command: %s", cmdContent)
+		
+		// 1. Extract Metadata
+		timestampFloat, _ := msg["timestamp"].(float64)
+		timestamp := int64(timestampFloat)
+		signature, _ := msg["signature"].(string)
+
+		log.Printf("📥 Received Command: %s (TS: %d)", cmdContent, timestamp)
+
+		// 2. Security Checks
+		if c.verifier == nil || len(c.verifier) != ed25519.PublicKeySize {
+			log.Println("🛑 Security Error: No valid Public Key configured. Rejecting command.")
+			return
+		}
+
+		// Check Freshness (prevent replay attacks, allow 60s window)
+		now := time.Now().Unix()
+		if now-timestamp > 60 || timestamp > now+10 { // +10 for clock skew
+			log.Printf("🛑 Security Error: Command expired or future timestamp. (Delay: %ds)", now-timestamp)
+			return
+		}
+
+		// Verify Signature
+		// Match Python's signing format: "{timestamp}:{content}"
+		payload := fmt.Sprintf("%d:%s", timestamp, cmdContent)
+		sigBytes, err := base64.StdEncoding.DecodeString(signature)
+		if err != nil {
+			log.Println("🛑 Security Error: Invalid signature format.")
+			return
+		}
+
+		if !ed25519.Verify(c.verifier, []byte(payload), sigBytes) {
+			log.Println("🛑 Security Error: INVALID SIGNATURE! Command might be tampered.")
+			return
+		}
+
+		log.Println("✅ Signature Verified. Executing command...")
 
 		// Execute in Goroutine to avoid blocking the read loop
 		go func(cmd string) {

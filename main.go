@@ -32,6 +32,7 @@ func main() {
 		Token:     *token,
 		ServerID:  *serverID,
 		Version:   Version,
+		PublicKey: "wJh+OZuVdyjhHM8hvbUPIMNTjljYiL12K55YE94VYnQ=", // Ed25519 Public Key
 	}
 	agent := client.NewAgentClient(cfg)
 

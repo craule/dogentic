@@ -14,7 +14,7 @@ func UpdateAgent(version string) error {
 	// GitHub Release URL
 	// In a real app, you might want to fetch "latest" tag from GitHub API first
 	// to verify version, but for now we pull the specific version or latest.
-	url := "https://github.com/Dogentadmin/dogent-agent/releases/latest/download/dogent-agent"
+	url := "https://github.com/craule/dogentic/releases/latest/download/dogent-agent"
 
 	fmt.Printf("🚀 Starting Update to latest version from %s...\n", url)
 
